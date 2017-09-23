@@ -102,10 +102,10 @@ if __name__ == '__main__':
             img_out = np.squeeze(img_out).astype(np.uint8)
             img_out = cv2.cvtColor(img_out, cv2.COLOR_BGR2RGB)
 
-            # If vertical orientation is used then rotate 90 degrees
+            # If vertical orientation is used then rotate 90 degrees and mirror
             if args.vertical:
-                frame = np.fliplr(np.swapaxes(frame, 0, 1))
-                img_out = np.fliplr(np.swapaxes(img_out, 0, 1))
+                frame = np.swapaxes(frame, 0, 1)
+                img_out = np.swapaxes(img_out, 0, 1)
 
             # Put the FPS on it.
             # img_out = cv2.putText(img_out, 'fps: {}'.format(fps), (50, 50),
