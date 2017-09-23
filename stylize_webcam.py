@@ -17,6 +17,7 @@ def setup_parser():
     parser.add_argument('--capture_device', default=1)
     parser.add_argument('--vertical', action='store_true', default=False)
     parser.add_argument('--fullscreen', action='store_true', default=False)
+    parser.add_argument('--show_originals', action='store_true', default=False)
     parser.add_argument('--canvas_size', nargs=2, type=int, default=None)
     parser.add_argument('--style_image_path',
                         default='style_images/starry_night_crop.jpg')
@@ -77,11 +78,12 @@ if __name__ == '__main__':
 
     if args.fullscreen:
         cv2.namedWindow("result", cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
 
-    style_image = cv2.imread(args.style_image_path)
-    style_image = cv2.resize(style_image, (x_new/2, y_new/2))
-    
+    if args.show_originals:
+        style_image = cv2.imread(args.style_image_path)
+        style_image = cv2.resize(style_image, (x_new/2, y_new/2))
+
     # Begin filtering.
     with tf.Session() as sess:
         print 'Loading up model...'
@@ -111,10 +113,13 @@ if __name__ == '__main__':
                                   # 1.0, (255, 0, 0), 3)
             
             # Display the resulting frame
-            frame = cv2.resize(frame, (x_new/2, y_new/2))
-            image_display = np.concatenate((frame, style_image), axis=1)
-            output_frame = np.concatenate((img_out, image_display), axis=0)
-            
+            if args.show_originals:
+                frame = cv2.resize(frame, (x_new/2, y_new/2))
+                image_display = np.concatenate((frame, style_image), axis=1)
+                output_frame = np.concatenate((img_out, image_display), axis=0)
+            else:
+                output_frame = img_out
+
             if args.canvas_size:
                 padx = (args.canvas_size[0] - output_frame.shape[1]) // 2
                 pady = (args.canvas_size[1] - output_frame.shape[0]) // 2
