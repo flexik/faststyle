@@ -10,16 +10,18 @@ from im_transf_net import create_net
 import numpy as np
 import argparse
 
-# TODO: work out the dimension h/w convention for opencv + neural net.
-# TODO: feed appropriate fps to writer.
-
-
 def setup_parser():
     """Options for command-line input."""
     parser = argparse.ArgumentParser(description="""Use a trained fast style
                                      transfer model to filter webcam feed.""")
+    parser.add_argument('--capture_device', default=1)
+    parser.add_argument('--vertical', action='store_true', default=False)
+    parser.add_argument('--fullscreen', action='store_true', default=False)
+    parser.add_argument('--canvas_size', nargs=2, type=int, default=None)
+    parser.add_argument('--style_image_path',
+                        default='style_images/starry_night_crop.jpg')
     parser.add_argument('--model_path',
-                        default='./models/starry_final.ckpt',
+                        default='models/starry_final.ckpt',
                         help='Path to .ckpt for the trained model.')
     parser.add_argument('--upsample_method',
                         help="""The upsample method that was used to construct
@@ -48,7 +50,7 @@ if __name__ == '__main__':
     resolution = args.resolution
 
     # Instantiate video capture object.
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(args.capture_device)
 
     # Set resolution
     if resolution is not None:
@@ -68,10 +70,18 @@ if __name__ == '__main__':
     # Saver used to restore the model to the session.
     saver = tf.train.Saver()
 
-    # Instantiate a Writer to save the video.
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    out = cv2.VideoWriter('output.avi', fourcc, 15.0, (x_new, y_new))
+    if args.vertical:
+        t = x_new
+        x_new = y_new
+        y_new = t
 
+    if args.fullscreen:
+        cv2.namedWindow("result", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+    style_image = cv2.imread(args.style_image_path)
+    style_image = cv2.resize(style_image, (x_new/2, y_new/2))
+    
     # Begin filtering.
     with tf.Session() as sess:
         print 'Loading up model...'
@@ -80,6 +90,7 @@ if __name__ == '__main__':
         while(True):
             # Capture frame-by-frame
             ret, frame = cap.read()
+            assert ret
 
             # Make frame 4-D
             img_4d = frame[np.newaxis, :]
@@ -89,20 +100,30 @@ if __name__ == '__main__':
             img_out = np.squeeze(img_out).astype(np.uint8)
             img_out = cv2.cvtColor(img_out, cv2.COLOR_BGR2RGB)
 
-            # Write frame to file.
-            out.write(img_out)
+            # If vertical orientation is used then rotate 90 degrees
+            if args.vertical:
+                frame = np.fliplr(np.swapaxes(frame, 0, 1))
+                img_out = np.fliplr(np.swapaxes(img_out, 0, 1))
 
             # Put the FPS on it.
             # img_out = cv2.putText(img_out, 'fps: {}'.format(fps), (50, 50),
                                   # cv2.FONT_HERSHEY_SIMPLEX,
                                   # 1.0, (255, 0, 0), 3)
-
+            
             # Display the resulting frame
-            cv2.imshow('frame', img_out)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            frame = cv2.resize(frame, (x_new/2, y_new/2))
+            image_display = np.concatenate((frame, style_image), axis=1)
+            output_frame = np.concatenate((img_out, image_display), axis=0)
+            
+            if args.canvas_size:
+                padx = (args.canvas_size[0] - output_frame.shape[1]) // 2
+                pady = (args.canvas_size[1] - output_frame.shape[0]) // 2
+                output_frame = np.pad(output_frame, ((pady, pady), (padx, padx), (0, 0)), mode='constant')
+            
+            cv2.imshow('result', output_frame)
+            if cv2.waitKey(1) & 0xFF == 27:
                 break
 
     # When everything done, release the capture
     cap.release()
-    out.release()
     cv2.destroyAllWindows()
