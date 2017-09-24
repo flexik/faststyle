@@ -1,10 +1,7 @@
-"""Use a model to stylize an OpenCV webcam feed.
-
-File author: Grant Watson
-Date: Feb 2017
-"""
+"""Use a model to stylize an OpenCV webcam feed."""
 
 import cv2
+from multiprocessing import Process, Queue, Array, Value
 import tensorflow as tf
 from im_transf_net import create_net
 import numpy as np
@@ -14,6 +11,8 @@ def setup_parser():
     """Options for command-line input."""
     parser = argparse.ArgumentParser(description="""Use a trained fast style
                                      transfer model to filter webcam feed.""")
+    parser.add_argument("--frame_width", type=int, default=640)
+    parser.add_argument("--frame_height", type=int, default=480)
     parser.add_argument('--capture_device', default=1)
     parser.add_argument('--vertical', action='store_true', default=False)
     parser.add_argument('--fullscreen', action='store_true', default=False)
@@ -30,43 +29,34 @@ def setup_parser():
                         chosen an error will be thrown.""",
                         choices=['resize', 'deconv'],
                         default='resize')
-    parser.add_argument('--resolution',
-                        help="""Dimensions for webcam. Note that, depending on
-                        the webcam, only certain resolutions will be possible.
-                        Leave this argument blank if want to use default
-                        resolution.""",
-                        nargs=2,
-                        type=int,
-                        default=None)
     return parser
 
+def capture(last_frame, done, args):
+    print "Starting capture..."
 
-if __name__ == '__main__':
-
-    # Command-line argument parsing.
-    parser = setup_parser()
-    args = parser.parse_args()
-    model_path = args.model_path
-    upsample_method = args.upsample_method
-    resolution = args.resolution
-
-    # Instantiate video capture object.
     cap = cv2.VideoCapture(args.capture_device)
+    while not done.value:
+        ret, img = cap.read()
+        assert ret
+        # preprocess frame
+        img = cv2.resize(img, (args.frame_width, args.frame_height))
+        #img = cv2.flip(img, 1)
+        last_frame.raw = img.tostring()
+
+    cap.release()
+
+def processing(last_frame, done, args):
+    print "Starting processing..."
 
     # Set resolution
-    if resolution is not None:
-        x_length, y_length = resolution
-        cap.set(3, x_length)  # 3 and 4 are OpenCV property IDs.
-        cap.set(4, y_length)
-    x_new = int(cap.get(3))
-    y_new = int(cap.get(4))
+    x_new, y_new = (args.frame_width, args.frame_height)
     print 'Resolution is: {0} by {1}'.format(x_new, y_new)
 
     # Create the graph.
     shape = [1, y_new, x_new, 3]
     with tf.variable_scope('img_t_net'):
         X = tf.placeholder(tf.float32, shape=shape, name='input')
-        Y = create_net(X, upsample_method)
+        Y = create_net(X, args.upsample_method)
 
     # Saver used to restore the model to the session.
     saver = tf.train.Saver()
@@ -87,12 +77,12 @@ if __name__ == '__main__':
     # Begin filtering.
     with tf.Session() as sess:
         print 'Loading up model...'
-        saver.restore(sess, model_path)
+        saver.restore(sess, args.model_path)
         print 'Begin filtering...'
-        while(True):
+        while True:
             # Capture frame-by-frame
-            ret, frame = cap.read()
-            assert ret
+            frame = np.frombuffer(last_frame.raw, dtype=np.uint8)
+            frame = np.reshape(frame, (args.frame_height, args.frame_width, 3))
 
             # Make frame 4-D
             img_4d = frame[np.newaxis, :]
@@ -130,5 +120,31 @@ if __name__ == '__main__':
                 break
 
     # When everything done, release the capture
-    cap.release()
     cv2.destroyAllWindows()
+    done.value = 1
+
+if __name__ == '__main__':
+
+    # Command-line argument parsing.
+    parser = setup_parser()
+    args = parser.parse_args()
+
+    # set up interprocess communication buffers
+    img = 128 * np.ones((args.frame_height, args.frame_width, 3), dtype=np.uint8)
+    buf = img.tostring()
+    last_frame = Array('c', len(buf))
+    last_frame.raw = buf
+    done = Value('i', 0)
+
+    # launch capture process
+    c = Process(name='capture', target=capture , args=(last_frame, done, args))
+    c.start()
+
+    # launch face detection process
+    p = Process(name='processing', target=processing, args=(last_frame, done, args))
+    p.start()
+
+    # wait for processes to finish
+    p.join()
+    c.join()
+
