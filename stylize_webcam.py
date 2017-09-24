@@ -74,8 +74,12 @@ def processing(last_frame, done, args):
         style_image = cv2.imread(args.style_image_path)
         style_image = cv2.resize(style_image, (x_new/2, y_new/2))
 
+    # Do not allocate whole GPU memory to Tensorflow.
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+
     # Begin filtering.
-    with tf.Session() as sess:
+    with tf.Session(config=config) as sess:
         print 'Loading up model...'
         saver.restore(sess, args.model_path)
         print 'Begin filtering...'
