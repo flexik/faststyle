@@ -13,7 +13,7 @@ def setup_parser():
                                      transfer model to filter webcam feed.""")
     parser.add_argument("--frame_width", type=int, default=640)
     parser.add_argument("--frame_height", type=int, default=480)
-    parser.add_argument('--capture_device', default=1)
+    parser.add_argument('--capture_device', default=0)
     parser.add_argument('--vertical', action='store_true', default=False)
     parser.add_argument('--fullscreen', action='store_true', default=False)
     parser.add_argument('--show_originals', action='store_true', default=False)
@@ -105,7 +105,7 @@ def processing(last_frame, done, args):
             # img_out = cv2.putText(img_out, 'fps: {}'.format(fps), (50, 50),
                                   # cv2.FONT_HERSHEY_SIMPLEX,
                                   # 1.0, (255, 0, 0), 3)
-            
+
             # Display the resulting frame
             if args.show_originals:
                 frame = cv2.resize(frame, (x_new/2, y_new/2))
@@ -118,7 +118,7 @@ def processing(last_frame, done, args):
                 padx = (args.canvas_size[0] - output_frame.shape[1]) // 2
                 pady = (args.canvas_size[1] - output_frame.shape[0]) // 2
                 output_frame = np.pad(output_frame, ((pady, pady), (padx, padx), (0, 0)), mode='constant')
-            
+
             cv2.imshow('result', output_frame)
             if cv2.waitKey(1) & 0xFF == 27:
                 break
@@ -151,4 +151,3 @@ if __name__ == '__main__':
     # wait for processes to finish
     p.join()
     c.join()
-
