@@ -1,0 +1,13 @@
+name: style_transfer
+channels:
+- menpo
+- anaconda
+- conda-forge        
+dependencies:
+- python=2.7
+- pip
+- numpy
+#- opencv3
+- tensorflow-gpu=1.0.1
+- pip:
+  - opencv-python
