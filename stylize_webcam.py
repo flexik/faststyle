@@ -35,6 +35,7 @@ def capture(last_frame, done, args):
     print "Starting capture..."
 
     cap = cv2.VideoCapture(args.capture_device)
+    #cap.open()
     while not done.value:
         ret, img = cap.read()
         assert ret
@@ -66,9 +67,9 @@ def processing(last_frame, done, args):
         x_new = y_new
         y_new = t
 
+    cv2.namedWindow("result", cv2.WINDOW_NORMAL)
     if args.fullscreen:
-        cv2.namedWindow("result", cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.cv.CV_WINDOW_FULLSCREEN)
+        cv2.setWindowProperty("result", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
     if args.show_originals:
         style_image = cv2.imread(args.style_image_path)
@@ -129,6 +130,9 @@ def processing(last_frame, done, args):
 
 if __name__ == '__main__':
 
+    #from tensorflow.python.client import device_lib
+    #print(device_lib.list_local_devices())
+
     # Command-line argument parsing.
     parser = setup_parser()
     args = parser.parse_args()
@@ -144,7 +148,7 @@ if __name__ == '__main__':
     c = Process(name='capture', target=capture , args=(last_frame, done, args))
     c.start()
 
-    # launch face detection process
+    # launch processing process
     p = Process(name='processing', target=processing, args=(last_frame, done, args))
     p.start()
 
